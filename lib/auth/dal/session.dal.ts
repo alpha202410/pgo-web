@@ -7,8 +7,12 @@ import 'server-only'
 import { SignJWT, jwtVerify } from 'jose'
 import { cookies } from 'next/headers'
 import { SessionPayload } from '@/lib/definitions'
+import { JWT } from '@/lib/config/constants'
 
-const secretKey = process.env.SESSION_SECRET || 'default-secret-key-change-me'
+const secretKey = process.env.SESSION_SECRET
+if (!secretKey) {
+  throw new Error('SESSION_SECRET environment variable is required')
+}
 const encodedKey = new TextEncoder().encode(secretKey)
 
 /**
@@ -18,7 +22,7 @@ export async function encryptSession(payload: SessionPayload): Promise<string> {
   return new SignJWT({ ...payload })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('7d')
+    .setExpirationTime(JWT.EXPIRY_STRING)
     .sign(encodedKey)
 }
 

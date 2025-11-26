@@ -23,7 +23,6 @@ import {
     getFacetedRowModel,
     getFacetedUniqueValues,
     getFilteredRowModel,
-    getPaginationRowModel,
     getSortedRowModel,
     Header,
     SortingState,
@@ -33,12 +32,11 @@ import {
 import { format } from "date-fns"
 
 import { useIsMobile } from "@/hooks/use-mobile"
-import { Transaction, TransactionSchema } from "@/lib/definitions"
-import { API_CONFIG } from "@/lib/config/api"
-import { buildEndpointUrl } from "@/lib/config/endpoints"
+import { Disbursement, DisbursementSchema } from "@/lib/definitions"
+import { useDisbursementsTableStore } from "@/lib/stores/disbursements-table-store"
 
 // Re-export schema for build compatibility
-export const schema = TransactionSchema
+export const schema = DisbursementSchema
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -84,7 +82,7 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { TableSkeletonRows } from "@/components/ui/table-skeleton"
-import { TRANSACTIONS_TABLE_COLUMNS } from "@/components/ui/table-skeleton-presets"
+import { DISBURSEMENTS_TABLE_COLUMNS } from "@/components/ui/table-skeleton-presets"
 
 // Helper function to format amount with currency
 function formatAmount(amount: string, currency: string): string {
@@ -105,7 +103,7 @@ function formatDate(dateString: string): string {
     }
 }
 
-// Helper function to truncate transaction ID
+// Helper function to truncate disbursement ID
 function truncateId(id: string, maxLength: number = 20): string {
     if (!id || id.length <= maxLength) return id
     return `${id.substring(0, maxLength)}...`
@@ -116,7 +114,7 @@ function SortableHeader({
     header,
     children
 }: {
-    header: Header<Transaction, unknown>
+    header: Header<Disbursement, unknown>
     children: React.ReactNode
 }) {
     const canSort = header.column.getCanSort()
@@ -147,282 +145,7 @@ function SortableHeader({
     )
 }
 
-// Actions cell component
-function ActionsCell({ transaction }: { transaction: Transaction }) {
-    const transactionId = transaction.uid || transaction.id
-    const [isDetailsOpen, setIsDetailsOpen] = React.useState(false)
-    const isMobile = useIsMobile()
-
-    const handleViewDetails = () => {
-        setIsDetailsOpen(true)
-    }
-
-    const handleRetry = async () => {
-        try {
-            const response = await fetch(
-                `${API_CONFIG.baseURL}${buildEndpointUrl.retryTransaction(transactionId)}`,
-                {
-                    method: "POST",
-                    headers: {
-                        ...API_CONFIG.headers,
-                        // Authorization header should be added by middleware or API route
-                    },
-                    credentials: "include",
-                }
-            )
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}))
-                throw new Error(errorData.message || "Failed to retry transaction")
-            }
-
-            const result = await response.json()
-            console.log("Transaction retry successful:", result)
-            // Optionally refresh the table data or show a success message
-        } catch (error) {
-            console.error("Error retrying transaction:", error)
-            // Optionally show an error toast/notification
-        }
-    }
-
-    const handleRefund = async () => {
-        try {
-            const response = await fetch(
-                `${API_CONFIG.baseURL}${buildEndpointUrl.refundTransaction(transactionId)}`,
-                {
-                    method: "POST",
-                    headers: {
-                        ...API_CONFIG.headers,
-                        // Authorization header should be added by middleware or API route
-                    },
-                    credentials: "include",
-                }
-            )
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}))
-                throw new Error(errorData.message || "Failed to refund transaction")
-            }
-
-            const result = await response.json()
-            console.log("Transaction refund successful:", result)
-            // Optionally refresh the table data or show a success message
-        } catch (error) {
-            console.error("Error refunding transaction:", error)
-            // Optionally show an error toast/notification
-        }
-    }
-
-    return (
-        <>
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button
-                        variant="ghost"
-                        className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
-                        size="icon"
-                    >
-                        <IconDotsVertical />
-                        <span className="sr-only">Open menu</span>
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-32">
-                    <DropdownMenuItem onClick={handleViewDetails}>
-                        View Details
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleRetry}>
-                        Retry
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem variant="destructive" onClick={handleRefund}>
-                        Refund
-                    </DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
-            <Drawer open={isDetailsOpen} onOpenChange={setIsDetailsOpen} direction={isMobile ? "bottom" : "right"}>
-                <DrawerContent>
-                    <DrawerHeader className="gap-1">
-                        <DrawerTitle>Transaction Details</DrawerTitle>
-                        <DrawerDescription>
-                            Transaction ID: {transaction.uid}
-                        </DrawerDescription>
-                    </DrawerHeader>
-                    <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">
-                        {/* Transaction IDs Section */}
-                        <div className="flex flex-col gap-3">
-                            <Label className="text-base font-semibold">Transaction IDs</Label>
-                            <div className="grid gap-2 rounded-lg border p-3">
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Internal:</span>
-                                    <span className="font-mono text-xs">{transaction.internalTransactionId}</span>
-                                </div>
-                                {transaction.externalTransactionId && (
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">External:</span>
-                                        <span className="font-mono text-xs">{transaction.externalTransactionId}</span>
-                                    </div>
-                                )}
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Merchant:</span>
-                                    <span className="font-mono text-xs">{transaction.merchantTransactionId}</span>
-                                </div>
-                                {transaction.pspTransactionId && (
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">PSP:</span>
-                                        <span className="font-mono text-xs">{transaction.pspTransactionId}</span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        <Separator />
-
-                        {/* Amount and Currency */}
-                        <div className="flex flex-col gap-3">
-                            <Label className="text-base font-semibold">Amount</Label>
-                            <div className="text-2xl font-bold">
-                                {formatAmount(transaction.amount, transaction.currency)}
-                            </div>
-                        </div>
-
-                        <Separator />
-
-                        {/* Customer Information */}
-                        <div className="flex flex-col gap-3">
-                            <Label className="text-base font-semibold">Customer Information</Label>
-                            <div className="grid gap-2 rounded-lg border p-3">
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Name:</span>
-                                    <span>{transaction.customerName || "-"}</span>
-                                </div>
-                                {transaction.customerIdentifier && (
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Identifier:</span>
-                                        <span>{transaction.customerIdentifier}</span>
-                                    </div>
-                                )}
-                                {transaction.paymentMethod && (
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Payment Method:</span>
-                                        <span>{transaction.paymentMethod}</span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        <Separator />
-
-                        {/* Status */}
-                        <div className="flex flex-col gap-3">
-                            <Label className="text-base font-semibold">Status</Label>
-                            <Badge
-                                variant="outline"
-                                className="w-fit px-3 py-1"
-                                style={{
-                                    backgroundColor: `${transaction.colorCode}20`,
-                                    borderColor: transaction.colorCode,
-                                    color: transaction.colorCode,
-                                }}
-                            >
-                                {transaction.status === "SUCCESS" || transaction.status === "COMPLETED" ? (
-                                    <IconCircleCheckFilled className="mr-2 size-4" />
-                                ) : transaction.status === "FAILED" ? (
-                                    <span className="mr-2">✕</span>
-                                ) : (
-                                    <IconLoader className="mr-2 size-4" />
-                                )}
-                                {transaction.status}
-                            </Badge>
-                        </div>
-
-                        <Separator />
-
-                        {/* Merchant Information */}
-                        <div className="flex flex-col gap-3">
-                            <Label className="text-base font-semibold">Merchant Information</Label>
-                            <div className="grid gap-2 rounded-lg border p-3">
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Merchant:</span>
-                                    <span>{transaction.merchantName}</span>
-                                </div>
-                                {transaction.submerchantName && (
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Submerchant:</span>
-                                        <span>{transaction.submerchantName}</span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        <Separator />
-
-                        {/* PGO Information */}
-                        <div className="flex flex-col gap-3">
-                            <Label className="text-base font-semibold">Payment Gateway</Label>
-                            <div className="rounded-lg border p-3">
-                                <div className="font-medium">{transaction.pgoName}</div>
-                            </div>
-                        </div>
-
-                        {/* Error Information */}
-                        {(transaction.status === "FAILED" || transaction.errorCode || transaction.errorMessage || transaction.description) && (
-                            <>
-                                <Separator />
-                                <div className="flex flex-col gap-3">
-                                    <Label className="text-base font-semibold text-destructive">Error Information</Label>
-                                    <div className="grid gap-2 rounded-lg border border-destructive/20 bg-destructive/5 p-3">
-                                        {transaction.errorCode && (
-                                            <div className="flex justify-between">
-                                                <span className="text-muted-foreground">Error Code:</span>
-                                                <span className="font-medium text-destructive">{transaction.errorCode}</span>
-                                            </div>
-                                        )}
-                                        {transaction.errorMessage && (
-                                            <div className="flex flex-col gap-1">
-                                                <span className="text-muted-foreground">Error Message:</span>
-                                                <span className="text-destructive">{transaction.errorMessage}</span>
-                                            </div>
-                                        )}
-                                        {transaction.description && (
-                                            <div className="flex flex-col gap-1">
-                                                <span className="text-muted-foreground">Description:</span>
-                                                <span>{transaction.description}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </>
-                        )}
-
-                        <Separator />
-
-                        {/* Timestamps */}
-                        <div className="flex flex-col gap-3">
-                            <Label className="text-base font-semibold">Timestamps</Label>
-                            <div className="grid gap-2 rounded-lg border p-3">
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Created:</span>
-                                    <span>{formatDate(transaction.createdAt)}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Updated:</span>
-                                    <span>{formatDate(transaction.updatedAt)}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <DrawerFooter>
-                        <DrawerClose asChild>
-                            <Button variant="outline">Close</Button>
-                        </DrawerClose>
-                    </DrawerFooter>
-                </DrawerContent>
-            </Drawer>
-        </>
-    )
-}
-
-const columns: ColumnDef<Transaction>[] = [
+const columns: ColumnDef<Disbursement>[] = [
     {
         id: "select",
         header: ({ table }) => (
@@ -453,12 +176,12 @@ const columns: ColumnDef<Transaction>[] = [
         accessorKey: "merchantTransactionId",
         header: ({ header }) => (
             <SortableHeader header={header}>
-                Transaction ID
+                Disbursement ID
             </SortableHeader>
         ),
         cell: ({ row }) => {
-            const transactionId = row.original.merchantTransactionId || "-"
-            const truncatedId = transactionId !== "-" ? truncateId(transactionId, 20) : "-"
+            const disbursementId = row.original.merchantTransactionId || "-"
+            const truncatedId = disbursementId !== "-" ? truncateId(disbursementId, 20) : "-"
 
             return (
                 <TooltipProvider>
@@ -468,9 +191,9 @@ const columns: ColumnDef<Transaction>[] = [
                                 <TableCellViewer item={row.original} displayText={truncatedId} />
                             </div>
                         </TooltipTrigger>
-                        {transactionId !== "-" && (
+                        {disbursementId !== "-" && (
                             <TooltipContent>
-                                <p className="font-mono text-xs max-w-xs break-all">{transactionId}</p>
+                                <p className="font-mono text-xs max-w-xs break-all">{disbursementId}</p>
                             </TooltipContent>
                         )}
                     </Tooltip>
@@ -605,29 +328,60 @@ const columns: ColumnDef<Transaction>[] = [
     },
     {
         id: "actions",
-        cell: ({ row }) => <ActionsCell transaction={row.original} />,
+        cell: () => (
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button
+                        variant="ghost"
+                        className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
+                        size="icon"
+                    >
+                        <IconDotsVertical />
+                        <span className="sr-only">Open menu</span>
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-32">
+                    <DropdownMenuItem>View Details</DropdownMenuItem>
+                    <DropdownMenuItem>Retry</DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem variant="destructive">Cancel</DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+        ),
     },
 ]
 
 
-export function TransactionTable({
+interface PaginationMeta {
+    pageNumber: number;
+    pageSize: number;
+    totalElements: number;
+    totalPages: number;
+    last: boolean;
+    first: boolean;
+}
+
+export function DisbursementTable({
     data,
+    paginationMeta,
     isLoading = false,
 }: {
-    data: Transaction[];
+    data: Disbursement[];
+    paginationMeta: PaginationMeta;
     isLoading?: boolean;
 }) {
-    const [rowSelection, setRowSelection] = React.useState({})
-    const [columnVisibility, setColumnVisibility] =
-        React.useState<VisibilityState>({})
-    const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-        []
-    )
-    const [sorting, setSorting] = React.useState<SortingState>([])
-    const [pagination, setPagination] = React.useState({
-        pageIndex: 0,
-        pageSize: 10,
-    })
+    const {
+        pagination: paginationState,
+        sorting,
+        columnFilters,
+        columnVisibility,
+        rowSelection,
+        setPagination,
+        setSorting,
+        setColumnFilters,
+        setColumnVisibility,
+        setRowSelection,
+    } = useDisbursementsTableStore()
 
     const table = useReactTable({
         data,
@@ -637,7 +391,7 @@ export function TransactionTable({
             columnVisibility,
             rowSelection,
             columnFilters,
-            pagination,
+            pagination: paginationState,
         },
         getRowId: (row) => row.uid,
         enableRowSelection: true,
@@ -645,27 +399,35 @@ export function TransactionTable({
         onSortingChange: setSorting,
         onColumnFiltersChange: setColumnFilters,
         onColumnVisibilityChange: setColumnVisibility,
-        onPaginationChange: setPagination,
+        onPaginationChange: (updater) => {
+            const newPagination = typeof updater === 'function'
+                ? updater(paginationState)
+                : updater;
+            setPagination(newPagination);
+        },
+        // Server-side pagination configuration
+        manualPagination: true,
+        pageCount: paginationMeta.totalPages,
         getCoreRowModel: getCoreRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
-        getPaginationRowModel: getPaginationRowModel(),
+        // Remove getPaginationRowModel - we're using server-side pagination
         getSortedRowModel: getSortedRowModel(),
         getFacetedRowModel: getFacetedRowModel(),
         getFacetedUniqueValues: getFacetedUniqueValues(),
     })
 
 
-    // Get unique values for filters
+    // Get unique values for filters (from current page data)
     const statusColumn = table.getColumn("status")
     const pgoColumn = table.getColumn("pgoName")
 
     const statusValues = React.useMemo(() => {
-        const uniqueStatuses = new Set(data.map((t) => t.status))
+        const uniqueStatuses = new Set(data.map((d) => d.status))
         return Array.from(uniqueStatuses).sort()
     }, [data])
 
     const pgoValues = React.useMemo(() => {
-        const uniquePgos = new Set(data.map((t) => t.pgoName).filter(Boolean))
+        const uniquePgos = new Set(data.map((d) => d.pgoName).filter(Boolean))
         return Array.from(uniquePgos).sort()
     }, [data])
 
@@ -778,6 +540,7 @@ export function TransactionTable({
                             .getAllColumns()
                             .filter(
                                 (column) =>
+                                    typeof column.accessorFn !== "undefined" &&
                                     column.getCanHide()
                             )
                             .map((column) => {
@@ -821,7 +584,7 @@ export function TransactionTable({
                             </TableHeader>
                             <TableBody className="**:data-[slot=table-cell]:first:w-8">
                                 {isLoading ? (
-                                    <TableSkeletonRows rows={10} columns={TRANSACTIONS_TABLE_COLUMNS} />
+                                    <TableSkeletonRows rows={10} columns={DISBURSEMENTS_TABLE_COLUMNS} />
                                 ) : table.getRowModel().rows?.length ? (
                                     table.getRowModel().rows.map((row) => (
                                         <TableRow
@@ -849,12 +612,12 @@ export function TransactionTable({
                         </Table>
                     </div>
                 </div>
-                <div className="flex items-center justify-between px-4 flex-shrink-0">
+                <div className="flex items-center justify-between px-4 shrink-0">
                     <div className="text-muted-foreground hidden flex-1 text-sm lg:flex min-w-0">
                         {table.getFilteredSelectedRowModel().rows.length} of{" "}
-                        {table.getFilteredRowModel().rows.length} row(s) selected.
+                        {paginationMeta.totalElements} row(s) selected.
                     </div>
-                    <div className="flex w-full items-center gap-8 lg:w-fit flex-shrink-0">
+                    <div className="flex w-full items-center gap-8 lg:w-fit shrink-0">
                         <div className="hidden items-center gap-2 lg:flex">
                             <Label htmlFor="rows-per-page" className="text-sm font-medium">
                                 Rows per page
@@ -862,7 +625,12 @@ export function TransactionTable({
                             <Select
                                 value={`${table.getState().pagination.pageSize}`}
                                 onValueChange={(value) => {
-                                    table.setPageSize(Number(value))
+                                    const newPageSize = Number(value);
+                                    // Reset to first page when changing page size
+                                    setPagination({
+                                        pageIndex: 0,
+                                        pageSize: newPageSize,
+                                    });
                                 }}
                             >
                                 <SelectTrigger size="sm" className="w-20" id="rows-per-page">
@@ -881,14 +649,15 @@ export function TransactionTable({
                         </div>
                         <div className="flex w-fit items-center justify-center text-sm font-medium">
                             Page {table.getState().pagination.pageIndex + 1} of{" "}
-                            {table.getPageCount()}
+                            {paginationMeta.totalPages || 1}
+                            {isLoading && <IconLoader className="ml-2 size-4 animate-spin" />}
                         </div>
                         <div className="ml-auto flex items-center gap-2 lg:ml-0">
                             <Button
                                 variant="outline"
                                 className="hidden h-8 w-8 p-0 lg:flex"
-                                onClick={() => table.setPageIndex(0)}
-                                disabled={!table.getCanPreviousPage()}
+                                onClick={() => setPagination({ ...paginationState, pageIndex: 0 })}
+                                disabled={paginationMeta.first || isLoading}
                             >
                                 <span className="sr-only">Go to first page</span>
                                 <IconChevronsLeft />
@@ -897,8 +666,8 @@ export function TransactionTable({
                                 variant="outline"
                                 className="size-8"
                                 size="icon"
-                                onClick={() => table.previousPage()}
-                                disabled={!table.getCanPreviousPage()}
+                                onClick={() => setPagination({ ...paginationState, pageIndex: paginationState.pageIndex - 1 })}
+                                disabled={paginationMeta.first || isLoading}
                             >
                                 <span className="sr-only">Go to previous page</span>
                                 <IconChevronLeft />
@@ -907,8 +676,8 @@ export function TransactionTable({
                                 variant="outline"
                                 className="size-8"
                                 size="icon"
-                                onClick={() => table.nextPage()}
-                                disabled={!table.getCanNextPage()}
+                                onClick={() => setPagination({ ...paginationState, pageIndex: paginationState.pageIndex + 1 })}
+                                disabled={paginationMeta.last || isLoading}
                             >
                                 <span className="sr-only">Go to next page</span>
                                 <IconChevronRight />
@@ -917,8 +686,8 @@ export function TransactionTable({
                                 variant="outline"
                                 className="hidden size-8 lg:flex"
                                 size="icon"
-                                onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-                                disabled={!table.getCanNextPage()}
+                                onClick={() => setPagination({ ...paginationState, pageIndex: (paginationMeta.totalPages || 1) - 1 })}
+                                disabled={paginationMeta.last || isLoading}
                             >
                                 <span className="sr-only">Go to last page</span>
                                 <IconChevronsRight />
@@ -932,7 +701,7 @@ export function TransactionTable({
 }
 
 
-function TableCellViewer({ item, displayText }: { item: Transaction; displayText?: string }) {
+function TableCellViewer({ item, displayText }: { item: Disbursement; displayText?: string }) {
     const isMobile = useIsMobile()
     const textToShow = displayText || item.merchantTransactionId || "-"
 
@@ -945,15 +714,15 @@ function TableCellViewer({ item, displayText }: { item: Transaction; displayText
             </DrawerTrigger>
             <DrawerContent>
                 <DrawerHeader className="gap-1">
-                    <DrawerTitle>Transaction Details</DrawerTitle>
+                    <DrawerTitle>Disbursement Details</DrawerTitle>
                     <DrawerDescription>
-                        Transaction ID: {item.uid}
+                        Disbursement ID: {item.uid}
                     </DrawerDescription>
                 </DrawerHeader>
                 <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">
-                    {/* Transaction IDs Section */}
+                    {/* Disbursement IDs Section */}
                     <div className="flex flex-col gap-3">
-                        <Label className="text-base font-semibold">Transaction IDs</Label>
+                        <Label className="text-base font-semibold">Disbursement IDs</Label>
                         <div className="grid gap-2 rounded-lg border p-3">
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">Internal:</span>
@@ -1123,3 +892,4 @@ function TableCellViewer({ item, displayText }: { item: Transaction; displayText
         </Drawer>
     )
 }
+

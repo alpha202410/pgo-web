@@ -61,3 +61,99 @@ export const TransactionSchema = z.object({
 })
 
 export type Transaction = z.infer<typeof TransactionSchema>
+
+export const DisbursementSchema = z.object({
+  id: z.string(),
+  uid: z.string(),
+  internalTransactionId: z.string().optional().default(''),
+  externalTransactionId: z.string().optional().default(''),
+  merchantTransactionId: z.string().optional().default(''),
+  pspTransactionId: z.string().optional().default(''),
+  amount: z.string(),
+  currency: z.string(),
+  customerIdentifier: z.string().optional().default(''),
+  paymentMethod: z.string().optional().default(''),
+  customerName: z.string().optional().default(''),
+  status: z.string(),
+  colorCode: z.string(),
+  errorCode: z.string().optional().default(''),
+  errorMessage: z.string().optional().default(''),
+  description: z.string().optional().default(''),
+  pgoId: z.string(),
+  pgoName: z.string(),
+  merchantId: z.string(),
+  merchantName: z.string().optional().default(''),
+  submerchantId: z.string().optional().default(''),
+  submerchantUid: z.string().optional().default(''),
+  submerchantName: z.string().optional().default(''),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+
+export type Disbursement = z.infer<typeof DisbursementSchema>
+
+export const UserSchema = z.object({
+  id: z.string(),
+  username: z.string(),
+  email: z.string(),
+  role: z.string(),
+  is_active: z.boolean(),
+  is_locked: z.boolean(),
+  associated_merchant_id: z.string().nullable(),
+  last_login_at: z.string().nullable(),
+  created_at: z.string().nullable(),
+})
+
+export type User = z.infer<typeof UserSchema>
+
+export const MerchantSchema = z.object({
+  id: z.string(),
+  uid: z.string(),
+  code: z.string(),
+  name: z.string(),
+  type: z.string().optional(),
+  status: z.string(), // active/inactive
+  kyc_verified: z.boolean(),
+  email: z.string().nullable().optional(),
+  contact_info: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  created_at: z.string().nullable(),
+  updated_at: z.string().nullable(),
+})
+
+export type Merchant = z.infer<typeof MerchantSchema>
+
+// Breakdown item schema for reports (count and value)
+const BreakdownItemSchema = z.object({
+  count: z.number(),
+  value: z.number(),
+})
+
+export type BreakdownItem = z.infer<typeof BreakdownItemSchema>
+
+// Monthly Transaction Summary Report Schema (FR-REP-001)
+export const MonthlyTransactionSummarySchema = z.object({
+  report_period: z.string(), // Format: "YYYY-MM"
+  total_transactions: z.number(),
+  total_value: z.number(),
+  currency: z.string(),
+  status_breakdown: z.record(z.string(), BreakdownItemSchema),
+  pgo_breakdown: z.record(z.string(), BreakdownItemSchema),
+  method_breakdown: z.record(z.string(), BreakdownItemSchema),
+})
+
+export type MonthlyTransactionSummary = z.infer<typeof MonthlyTransactionSummarySchema>
+
+// Query params for monthly transaction summary
+export interface MonthlyTransactionSummaryParams {
+  year: number
+  month?: number
+  merchant_id?: string
+  pgo_id?: string
+}
+
+import type { PaginatedApiResponse } from '@/lib/types'
+
+export type PaginatedDisbursementResponse = PaginatedApiResponse<Disbursement>
+export type PaginatedUserResponse = PaginatedApiResponse<User>
+export type PaginatedMerchantResponse = PaginatedApiResponse<Merchant>

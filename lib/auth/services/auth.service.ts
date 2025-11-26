@@ -70,7 +70,8 @@ export async function logout(): Promise<void> {
  * Encrypts and stores session in cookie
  */
 export async function createSession(sessionData: SessionData): Promise<void> {
-    const expiresAt = Date.now() + 5 * 60 * 60 * 1000; // 5 hours from now
+    const { SESSION } = await import('@/lib/config/constants');
+    const expiresAt = Date.now() + SESSION.EXPIRY_MS;
     const sessionPayload: SessionPayload = {
         ...sessionData,
         expiresAt,

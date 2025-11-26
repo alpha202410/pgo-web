@@ -2,22 +2,21 @@ import {
     defaultShouldDehydrateQuery,
     QueryClient,
 } from '@tanstack/react-query';
+import { QUERY_CACHE } from '@/lib/config/constants';
 
 export function makeQueryClient() {
     return new QueryClient({
         defaultOptions: {
             queries: {
-                staleTime: 30 * 1000,
+                staleTime: QUERY_CACHE.STALE_TIME_LIST,
+                gcTime: QUERY_CACHE.GC_TIME_DEFAULT,
             },
             dehydrate: {
-                // serializeData: superjson.serialize,
                 shouldDehydrateQuery: (query) =>
                     defaultShouldDehydrateQuery(query) ||
                     query.state.status === 'pending',
             },
-            hydrate: {
-                // deserializeData: superjson.deserialize,
-            },
         },
     });
 }
+

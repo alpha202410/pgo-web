@@ -6,6 +6,16 @@ export interface ApiResponse<T = unknown> {
   errors?: Record<string, string[]>;
 }
 
+export interface PaginatedApiResponse<T = unknown> {
+  data: T[];
+  pageNumber: number;
+  pageSize: number;
+  totalElements: number;
+  totalPages: number;
+  last: boolean;
+  first: boolean;
+}
+
 export interface User {
   id: string;
   uid: string;

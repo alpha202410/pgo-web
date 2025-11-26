@@ -212,6 +212,11 @@ export const API_ENDPOINTS = {
     exists: "/admin/v1/merchants/exists/{code}",
     validateCode: "/admin/v1/merchants/validate-code/{code}",
   },
+
+  // Reports endpoints
+  reports: {
+    transactionsMonthly: "/api/v1/reports/transactions/monthly",
+  },
 };
 
 export const PAGINATION_DEFAULTS = {

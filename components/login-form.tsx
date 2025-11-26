@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { useActionState } from 'react'
-import { login } from '@/app/actions/auth.actions'
+import { login } from '@/app/(auth)/actions/auth.actions'
 import Image from "next/image"
 
 export function LoginForm({
@@ -85,7 +85,7 @@ export function LoginForm({
                 </Button>
               </Field>
 
-              
+
             </FieldGroup>
           </form>
           <div className="bg-muted relative hidden md:block">

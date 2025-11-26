@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { logout } from "@/app/actions/auth.actions"
+import { logout } from "@/app/(auth)/actions/auth.actions"
 import { LogOut, User } from "lucide-react"
 
 export async function SiteHeader() {
