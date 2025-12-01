@@ -9,7 +9,6 @@
 import { FormState, LoginFormSchema } from '@/lib/definitions'
 import { redirect } from 'next/navigation'
 import { login as authLogin, logout as authLogout, clearExpiredSession as authClearExpiredSession } from '@/lib/auth/services/auth.service'
-import { LoginCredentials } from '@/lib/auth/types'
 
 /**
  * Login server action
@@ -30,9 +29,12 @@ export async function login(prevState: FormState, formData: FormData): Promise<F
 
     const { username, password } = validatedFields.data
 
+    let requirePasswordChange = false;
+
     try {
         // Call auth service
-        await authLogin({ username, password })
+        const result = await authLogin({ username, password })
+        requirePasswordChange = result.requirePasswordChange;
     } catch (error) {
         console.error('Login error:', error)
 
@@ -71,7 +73,12 @@ export async function login(prevState: FormState, formData: FormData): Promise<F
         }
     }
 
-    // Redirect on success
+    // Redirect based on password change requirement
+    if (requirePasswordChange) {
+        redirect('/change-password')
+    }
+
+    // Redirect to dashboard on success
     redirect('/dashboard')
 }
 

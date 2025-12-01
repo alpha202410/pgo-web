@@ -1,11 +1,10 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { ColumnFiltersState, SortingState, VisibilityState } from '@tanstack/react-table';
-import { PAGINATION } from '@/lib/config/constants';
 
-interface UsersTableState {
+interface LogsTableState {
     pagination: {
-        pageIndex: number; // 0-based page index for TanStack React Table
+        pageIndex: number;
         pageSize: number;
     };
     sorting: SortingState;
@@ -14,7 +13,7 @@ interface UsersTableState {
     rowSelection: Record<string, boolean>;
 }
 
-interface UsersTableActions {
+interface LogsTableActions {
     setPagination: (pagination: { pageIndex: number; pageSize: number }) => void;
     setSorting: (sorting: SortingState | ((prev: SortingState) => SortingState)) => void;
     setColumnFilters: (filters: ColumnFiltersState | ((prev: ColumnFiltersState) => ColumnFiltersState)) => void;
@@ -23,10 +22,10 @@ interface UsersTableActions {
     resetTableState: () => void;
 }
 
-const initialState: UsersTableState = {
+const initialState: LogsTableState = {
     pagination: {
-        pageIndex: 0, // 0-based for TanStack React Table (first page)
-        pageSize: PAGINATION.DEFAULT_PAGE_SIZE,
+        pageIndex: 0,
+        pageSize: 15,
     },
     sorting: [],
     columnFilters: [],
@@ -34,7 +33,7 @@ const initialState: UsersTableState = {
     rowSelection: {},
 };
 
-export const useUsersTableStore = create<UsersTableState & UsersTableActions>()(
+export const useLogsTableStore = create<LogsTableState & LogsTableActions>()(
     persist(
         (set) => ({
             ...initialState,
@@ -60,7 +59,7 @@ export const useUsersTableStore = create<UsersTableState & UsersTableActions>()(
             resetTableState: () => set(initialState),
         }),
         {
-            name: 'users-table-state',
+            name: 'logs-table-state',
             partialize: (state) => ({
                 // Persist everything except rowSelection (reset on refresh)
                 pagination: state.pagination,
@@ -71,3 +70,4 @@ export const useUsersTableStore = create<UsersTableState & UsersTableActions>()(
         }
     )
 );
+

@@ -121,6 +121,20 @@ export const MerchantSchema = z.object({
   updated_at: z.string().nullable(),
 })
 
+export const AuditLogSchema = z.object({
+  id: z.string(),
+  user_id: z.string().nullable(),
+  username: z.string().nullable(),
+  action: z.string(), // e.g., 'USER_CREATED', 'PGO_UPDATED' - required field from API
+  description: z.string(),
+  ip_address: z.string(),
+  old_values: z.record(z.unknown()).nullable(),
+  new_values: z.record(z.unknown()).nullable(),
+  timestamp: z.string(), // datetime
+})
+
+export type AuditLog = z.infer<typeof AuditLogSchema>
+
 export type Merchant = z.infer<typeof MerchantSchema>
 
 // Breakdown item schema for reports (count and value)

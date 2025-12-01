@@ -217,6 +217,11 @@ export const API_ENDPOINTS = {
   reports: {
     transactionsMonthly: "/api/v1/reports/transactions/monthly",
   },
+
+  // Logs endpoints
+  logs: {
+    auditLogs: "/api/v1/audit-logs"
+  },
 };
 
 export const PAGINATION_DEFAULTS = {

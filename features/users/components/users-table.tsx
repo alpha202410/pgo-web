@@ -83,6 +83,7 @@ import {
 } from "@/components/ui/tooltip"
 import { TableSkeletonRows } from "@/components/ui/table-skeleton"
 import { USERS_TABLE_COLUMNS } from "@/components/ui/table-skeleton-presets"
+import { ResetPasswordDialog } from "./reset-password-dialog"
 
 // Helper function to format date
 function formatDate(dateString: string | null): string {
@@ -333,26 +334,39 @@ const columns: ColumnDef<User>[] = [
     },
     {
         id: "actions",
-        cell: () => (
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button
-                        variant="ghost"
-                        className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
-                        size="icon"
-                    >
-                        <IconDotsVertical />
-                        <span className="sr-only">Open menu</span>
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-32">
-                    <DropdownMenuItem>View Details</DropdownMenuItem>
-                    <DropdownMenuItem>Edit</DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
-        ),
+        cell: ({ row }) => {
+            const user = row.original;
+            return (
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
+                            size="icon"
+                        >
+                            <IconDotsVertical />
+                            <span className="sr-only">Open menu</span>
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-40">
+                        <DropdownMenuItem>View Details</DropdownMenuItem>
+                        <DropdownMenuItem>Edit</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <ResetPasswordDialog
+                            userId={user.id}
+                            username={user.username}
+                            trigger={
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                    Reset Password
+                                </DropdownMenuItem>
+                            }
+                        />
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            );
+        },
     },
 ]
 
@@ -676,9 +690,9 @@ export function UsersTable({
                                 value={`${table.getState().pagination.pageSize}`}
                                 onValueChange={(value) => {
                                     const newPageSize = Number(value);
-                                    // Reset to first page when changing page size (1-based)
+                                    // Reset to first page when changing page size (0-based)
                                     setPagination({
-                                        pageIndex: 1,
+                                        pageIndex: 0,
                                         pageSize: newPageSize,
                                     });
                                 }}
@@ -706,7 +720,7 @@ export function UsersTable({
                             <Button
                                 variant="outline"
                                 className="hidden h-8 w-8 p-0 lg:flex"
-                                onClick={() => setPagination({ ...paginationState, pageIndex: 1 })}
+                                onClick={() => setPagination({ ...paginationState, pageIndex: 0 })}
                                 disabled={paginationMeta.first || isLoading}
                             >
                                 <span className="sr-only">Go to first page</span>
@@ -736,7 +750,7 @@ export function UsersTable({
                                 variant="outline"
                                 className="hidden size-8 lg:flex"
                                 size="icon"
-                                onClick={() => setPagination({ ...paginationState, pageIndex: paginationMeta.totalPages || 1 })}
+                                onClick={() => setPagination({ ...paginationState, pageIndex: paginationMeta.totalPages ? paginationMeta.totalPages - 1 : 0 })}
                                 disabled={paginationMeta.last || isLoading}
                             >
                                 <span className="sr-only">Go to last page</span>

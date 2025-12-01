@@ -15,10 +15,18 @@ import { getRolesPermissions } from '../permissions'
 import { User } from '@/lib/types'
 
 /**
+ * Login result with password change requirement flag
+ */
+export interface LoginResult {
+    requirePasswordChange: boolean;
+}
+
+/**
  * Login user with credentials
  * Authenticates with external API and creates session
+ * Returns whether password change is required
  */
-export async function login(credentials: LoginCredentials): Promise<void> {
+export async function login(credentials: LoginCredentials): Promise<LoginResult> {
     const apiResult = await apiDal.authenticateUser(credentials)
 
     if (!apiResult.status || !apiResult.data) {
@@ -40,6 +48,8 @@ export async function login(credentials: LoginCredentials): Promise<void> {
         throw new Error('No username received from server')
     }
 
+    const requirePasswordChange = data.requirePasswordChange || false;
+
     // Prepare session data
     const sessionData: SessionData = {
         userId: data.id || data.uid || '',
@@ -51,10 +61,12 @@ export async function login(credentials: LoginCredentials): Promise<void> {
         email: data.email || '',
         roles: Array.isArray(data.roles) ? data.roles : [],
         userType: data.userType,
-        requirePasswordChange: data.requirePasswordChange || false,
+        requirePasswordChange,
     }
 
     await createSession(sessionData)
+
+    return { requirePasswordChange };
 }
 
 /**

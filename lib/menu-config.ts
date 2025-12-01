@@ -50,16 +50,10 @@ export const menuConfig = {
             permission: PERMISSIONS.DISBURSEMENTS.VIEW,
         },
         {
-            title: "Analytics",
-            url: "/analytics",
+            title: "Logs",
+            url: "/logs",
             icon: "IconChartBar",
-            // Analytics requires view permission for any major resource
-            permissions: [
-                PERMISSIONS.TRANSACTIONS.VIEW,
-                PERMISSIONS.MERCHANTS.VIEW,
-                PERMISSIONS.DISBURSEMENTS.VIEW,
-            ],
-            requireAll: false,
+            permission: PERMISSIONS.AUDIT_AND_LOGS.VIEW,
         },
     ] as MenuItem[],
 }

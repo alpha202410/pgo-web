@@ -2,27 +2,26 @@
 
 import { useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { UsersTable } from './users-table';
-import { NewUserDrawer } from './new-user-drawer';
-import { usersListQueryOptions, type UserListParams } from '@/features/users/queries/users';
-import { useUsersTableStore } from '@/lib/stores/users-table-store';
-import { PAGINATION } from '@/lib/config/constants';
+import { LogsTable } from './logs-table';
+import { auditLogsListQueryOptions, type AuditLogListParams } from '@/features/logs/queries/logs';
+import { useLogsTableStore } from '@/lib/stores/logs-table-store';
+import type { AuditLog } from '@/lib/definitions';
 
-export default function UsersList() {
+export default function LogsList() {
     const queryClient = useQueryClient();
-    const { pagination, sorting, columnFilters, setPagination, setSorting, setColumnFilters } = useUsersTableStore();
+    const { pagination, sorting, columnFilters, setPagination, setSorting, setColumnFilters } = useLogsTableStore();
 
     // Reset to first page when sorting or filtering changes
     useEffect(() => {
-        const currentPagination = useUsersTableStore.getState().pagination;
-        setPagination({ ...currentPagination, pageIndex: 0 }); // 0-based for TanStack React Table
+        const currentPagination = useLogsTableStore.getState().pagination;
+        setPagination({ ...currentPagination, pageIndex: 0 });
     }, [sorting, columnFilters, setPagination]);
 
-    // Convert 0-based pageIndex to 1-based page number for API
-    const page = pagination.pageIndex + 1;
+    // Use pageIndex directly (0-based) - backend uses 0-based pagination
+    const page = pagination.pageIndex;
     const per_page = pagination.pageSize;
 
-    // Convert sorting state to sort parameter format (e.g., ["username,asc", "email,desc"])
+    // Convert sorting state to sort parameter format (e.g., ["name,asc", "code,desc"])
     const sortParams = useMemo(() => {
         return sorting.map(sort => {
             const direction = sort.desc ? 'desc' : 'asc';
@@ -30,51 +29,55 @@ export default function UsersList() {
         });
     }, [sorting]);
 
-    // Convert column filters to query parameters
+    // Convert column filters to query parameters for audit logs
     const filterParams = useMemo(() => {
-        const params: { role?: string; status?: string } = {};
-        
+        const params: Partial<AuditLogListParams> = {};
+
         columnFilters.forEach(filter => {
-            if (filter.id === 'role' && Array.isArray(filter.value)) {
-                // For role filter, join multiple values with comma (or use first value)
-                // Adjust based on backend API expectations
-                params.role = filter.value.join(',');
-            } else if (filter.id === 'is_active' && Array.isArray(filter.value)) {
-                // Convert status filter values to backend format
-                // The filter uses combined values like 'active-unlocked', 'active-locked', etc.
-                // Backend might expect different format - adjust as needed
-                const statusValues = filter.value as string[];
-                if (statusValues.length > 0) {
-                    params.status = statusValues.join(',');
+            if (filter.id === 'action' && Array.isArray(filter.value)) {
+                // For action filter, join multiple values with comma
+                const actionValues = filter.value as string[];
+                if (actionValues.length > 0) {
+                    // Map action values to action_type query param (API expects action_type)
+                    params.action_type = actionValues.join(',');
                 }
+            } else if (filter.id === 'user_id' && filter.value) {
+                params.user_id = filter.value as string;
+            } else if (filter.id === 'search_term' && filter.value) {
+                params.search_term = filter.value as string;
+            } else if (filter.id === 'start_date' && filter.value) {
+                params.start_date = filter.value as string;
+            } else if (filter.id === 'end_date' && filter.value) {
+                params.end_date = filter.value as string;
             }
         });
-        
+
         return params;
     }, [columnFilters]);
 
     // Memoize queryParams to prevent unnecessary re-renders and ensure stable reference
-    const queryParams: UserListParams = useMemo(() => ({
+    const queryParams: AuditLogListParams = useMemo(() => ({
         page,
         per_page,
         ...(sortParams.length > 0 && { sort: sortParams }),
         ...filterParams,
     }), [page, per_page, sortParams, filterParams]);
 
-    const { data, isLoading, isFetching } = useQuery(usersListQueryOptions(queryParams));
+    const { data, isLoading, isFetching } = useQuery(auditLogsListQueryOptions(queryParams));
 
-    // Dynamically prefetch the next pages when page changes
+    // Dynamically prefetch the next 2 pages when page changes
     useEffect(() => {
         if (!data) return;
 
         const currentPage = data.pageNumber;
         const totalPages = data.totalPages;
 
-        // Prefetch next pages if they exist (1-based pagination)
+        // Prefetch next 2 pages if they exist (0-based pagination)
         const pagesToPrefetch: number[] = [];
-        for (let i = 1; i <= PAGINATION.PREFETCH_PAGES_AHEAD; i++) {
+        for (let i = 1; i <= 2; i++) {
             const nextPage = currentPage + i;
-            if (nextPage <= totalPages) {
+            // Use < instead of <= for 0-based pagination (pages 0 to totalPages-1)
+            if (nextPage < totalPages) {
                 pagesToPrefetch.push(nextPage);
             }
         }
@@ -82,27 +85,27 @@ export default function UsersList() {
         // Prefetch all next pages in parallel with error handling
         if (pagesToPrefetch.length > 0) {
             pagesToPrefetch.forEach((nextPage) => {
-                const nextPageParams: UserListParams = {
+                const nextPageParams: AuditLogListParams = {
                     ...queryParams,
                     page: nextPage,
                 };
 
                 // Only prefetch if not already in cache
                 const cachedData = queryClient.getQueryData(
-                    usersListQueryOptions(nextPageParams).queryKey
+                    auditLogsListQueryOptions(nextPageParams).queryKey
                 );
 
                 if (!cachedData) {
                     // Cancel any existing prefetch for this page using query cancellation
-                    const queryKey = usersListQueryOptions(nextPageParams).queryKey;
+                    const queryKey = auditLogsListQueryOptions(nextPageParams).queryKey;
                     queryClient.cancelQueries({ queryKey });
 
                     // Prefetch the next page with error handling
-                    queryClient.prefetchQuery(usersListQueryOptions(nextPageParams))
+                    queryClient.prefetchQuery(auditLogsListQueryOptions(nextPageParams))
                         .catch((error) => {
                             // Only log if not cancelled (cancelled queries are expected during cleanup)
                             if (error.name !== 'AbortError' && !error.message?.includes('cancel')) {
-                                console.error(`Failed to prefetch users page ${nextPage}:`, error);
+                                console.error(`Failed to prefetch audit logs page ${nextPage}:`, error);
                             }
                         });
                 }
@@ -113,18 +116,18 @@ export default function UsersList() {
         return () => {
             // Cancel all pending prefetch queries for next pages
             pagesToPrefetch.forEach((nextPage) => {
-                const nextPageParams: UserListParams = {
+                const nextPageParams: AuditLogListParams = {
                     ...queryParams,
                     page: nextPage,
                 };
-                const queryKey = usersListQueryOptions(nextPageParams).queryKey;
+                const queryKey = auditLogsListQueryOptions(nextPageParams).queryKey;
                 queryClient.cancelQueries({ queryKey });
             });
         };
     }, [queryParams, data, queryClient]);
 
-    // Extract users and pagination metadata
-    const users = data?.data ?? [];
+    // Extract audit logs and pagination metadata
+    const auditLogs = data?.data ?? [];
     const paginationMeta = data ? {
         pageNumber: data.pageNumber,
         pageSize: data.pageSize,
@@ -143,15 +146,12 @@ export default function UsersList() {
 
     return (
         <div className="@container/main flex flex-1 flex-col gap-2 py-2">
-            <div className="flex items-center justify-between px-4 lg:px-6">
-                <h1 className="text-2xl font-semibold">Users</h1>
-                <NewUserDrawer />
-            </div>
-            <UsersTable
-                data={users}
+            <LogsTable
+                data={auditLogs as unknown as AuditLog[]}
                 paginationMeta={paginationMeta}
                 isLoading={isLoading || isFetching}
             />
         </div>
     )
 }
+

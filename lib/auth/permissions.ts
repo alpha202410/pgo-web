@@ -71,6 +71,12 @@ export const PERMISSIONS = {
         ALL: 'roles.*',
     },
 
+    // audit and logs
+    AUDIT_AND_LOGS: {
+        VIEW: 'audit_and_logs.view',
+        ALL: 'audit_and_logs.*',
+    },
+
     // System/Admin
     SYSTEM: {
         ADMIN: 'system.admin',
@@ -93,6 +99,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
         PERMISSIONS.DISBURSEMENTS.ALL,
         PERMISSIONS.MERCHANTS.ALL,
         PERMISSIONS.ROLES.VIEW,
+        PERMISSIONS.AUDIT_AND_LOGS.VIEW,
     ],
 
     'Manager': [
@@ -101,6 +108,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
         PERMISSIONS.DISBURSEMENTS.VIEW,
         PERMISSIONS.MERCHANTS.VIEW,
         PERMISSIONS.MERCHANTS.UPDATE,
+        PERMISSIONS.AUDIT_AND_LOGS.VIEW,
     ],
 
     'Operator': [
@@ -108,12 +116,14 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
         PERMISSIONS.TRANSACTIONS.UPDATE_STATUS,
         PERMISSIONS.DISBURSEMENTS.VIEW,
         PERMISSIONS.MERCHANTS.VIEW,
+        PERMISSIONS.AUDIT_AND_LOGS.VIEW,
     ],
 
     'Viewer': [
         PERMISSIONS.TRANSACTIONS.VIEW,
         PERMISSIONS.DISBURSEMENTS.VIEW,
         PERMISSIONS.MERCHANTS.VIEW,
+        PERMISSIONS.AUDIT_AND_LOGS.VIEW,
     ],
 }
 

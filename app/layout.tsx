@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { QueryProvider } from "@/lib/query-provider";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import { Toaster } from "@/components/ui/sonner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -38,6 +39,7 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             {children}
+            <Toaster richColors position="top-right" />
             <ReactQueryDevtools initialIsOpen={false} />
           </ThemeProvider>
         </QueryProvider>
