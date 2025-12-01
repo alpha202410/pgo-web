@@ -91,7 +91,7 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { TableSkeletonRows } from "@/components/ui/table-skeleton"
-import { MERCHANTS_TABLE_COLUMNS } from "@/components/ui/table-skeleton-presets"
+import { LOGS_TABLE_COLUMNS } from "@/components/ui/table-skeleton-presets"
 
 // Helper function to format date
 function formatDate(dateString: string | null): string {
@@ -288,23 +288,34 @@ const columns: ColumnDef<AuditLog>[] = [
     },
     {
         id: "actions",
-        cell: () => (
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button
-                        variant="ghost"
-                        className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
-                        size="icon"
-                    >
-                        <IconDotsVertical />
-                        <span className="sr-only">Open menu</span>
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-40">
-                    <DropdownMenuItem>View Details</DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
-        ),
+        cell: ({ row, table }) => {
+            const openDetailDrawer = (table.options.meta as { openDetailDrawer?: (log: AuditLog) => void })?.openDetailDrawer
+            return (
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
+                            size="icon"
+                        >
+                            <IconDotsVertical />
+                            <span className="sr-only">Open menu</span>
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-40">
+                        <DropdownMenuItem
+                            onClick={() => {
+                                if (openDetailDrawer) {
+                                    openDetailDrawer(row.original)
+                                }
+                            }}
+                        >
+                            View Details
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            )
+        },
     },
 ]
 
@@ -340,6 +351,15 @@ export function LogsTable({
         setRowSelection,
     } = useLogsTableStore()
 
+    const [selectedLog, setSelectedLog] = React.useState<AuditLog | null>(null)
+    const [isDrawerOpen, setIsDrawerOpen] = React.useState(false)
+    const isMobile = useIsMobile()
+
+    const openDetailDrawer = React.useCallback((log: AuditLog) => {
+        setSelectedLog(log)
+        setIsDrawerOpen(true)
+    }, [])
+
     const table = useReactTable({
         data,
         columns,
@@ -349,6 +369,9 @@ export function LogsTable({
             rowSelection,
             columnFilters: columnFiltersState,
             pagination: paginationState,
+        },
+        meta: {
+            openDetailDrawer,
         },
         getRowId: (row) => row.id,
         enableRowSelection: true,
@@ -504,7 +527,7 @@ export function LogsTable({
                             </TableHeader>
                             <TableBody className="**:data-[slot=table-cell]:first:w-8">
                                 {isLoading ? (
-                                    <TableSkeletonRows rows={10} columns={MERCHANTS_TABLE_COLUMNS} />
+                                    <TableSkeletonRows rows={10} columns={LOGS_TABLE_COLUMNS} />
                                 ) : table.getRowModel().rows?.length ? (
                                     table.getRowModel().rows.map((row) => (
                                         <TableRow
@@ -616,6 +639,116 @@ export function LogsTable({
                     </div>
                 </div>
             </div>
+            {selectedLog && (
+                <Drawer
+                    open={isDrawerOpen}
+                    onOpenChange={(open) => {
+                        setIsDrawerOpen(open)
+                        if (!open) {
+                            setSelectedLog(null)
+                        }
+                    }}
+                    direction={isMobile ? "bottom" : "right"}
+                >
+                    <DrawerContent>
+                        <DrawerHeader className="gap-1">
+                            <DrawerTitle>Audit Log Details</DrawerTitle>
+                            <DrawerDescription>
+                                Audit Log ID: {selectedLog.id}
+                            </DrawerDescription>
+                        </DrawerHeader>
+                        <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">
+                            {/* Audit Log Information Section */}
+                            <div className="flex flex-col gap-3">
+                                <Label className="text-base font-semibold">Audit Log Information</Label>
+                                <div className="grid gap-2 rounded-lg border p-3">
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">ID:</span>
+                                        <span className="font-mono text-xs">{selectedLog.id}</span>
+                                    </div>
+                                    {selectedLog.user_id && (
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">User ID:</span>
+                                            <span className="font-mono text-xs">{selectedLog.user_id}</span>
+                                        </div>
+                                    )}
+                                    {selectedLog.username && (
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Username:</span>
+                                            <span>{selectedLog.username}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Action:</span>
+                                        <Badge variant="outline" className="font-mono text-xs">
+                                            {selectedLog.action || "-"}
+                                        </Badge>
+                                    </div>
+                                    {selectedLog.description && (
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Description:</span>
+                                            <span className="wrap-break-word text-right max-w-[60%]">{selectedLog.description}</span>
+                                        </div>
+                                    )}
+                                    {selectedLog.ip_address && (
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">IP Address:</span>
+                                            <span className="font-mono text-xs">{selectedLog.ip_address}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {(selectedLog.old_values || selectedLog.new_values) && (
+                                <>
+                                    <Separator />
+
+                                    {/* Changes Information */}
+                                    <div className="flex flex-col gap-3">
+                                        <Label className="text-base font-semibold">Changes</Label>
+                                        <div className="grid gap-2 rounded-lg border p-3">
+                                            {selectedLog.old_values && (
+                                                <div className="flex flex-col gap-1">
+                                                    <span className="text-muted-foreground font-medium">Old Values:</span>
+                                                    <pre className="text-xs bg-muted p-2 rounded overflow-auto max-h-40">
+                                                        {JSON.stringify(selectedLog.old_values, null, 2)}
+                                                    </pre>
+                                                </div>
+                                            )}
+                                            {selectedLog.new_values && (
+                                                <div className="flex flex-col gap-1">
+                                                    <span className="text-muted-foreground font-medium">New Values:</span>
+                                                    <pre className="text-xs bg-muted p-2 rounded overflow-auto max-h-40">
+                                                        {JSON.stringify(selectedLog.new_values, null, 2)}
+                                                    </pre>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
+                            <Separator />
+
+                            {/* Timestamp */}
+                            <div className="flex flex-col gap-3">
+                                <Label className="text-base font-semibold">Timestamp</Label>
+                                <div className="grid gap-2 rounded-lg border p-3">
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Timestamp:</span>
+                                        <span>{formatDate(selectedLog.timestamp)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <DrawerFooter>
+                            <DrawerClose asChild>
+                                <Button variant="outline">Close</Button>
+                            </DrawerClose>
+                        </DrawerFooter>
+                    </DrawerContent>
+                </Drawer>
+            )}
         </div>
     )
 }

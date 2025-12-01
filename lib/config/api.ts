@@ -216,6 +216,7 @@ export const API_ENDPOINTS = {
   // Reports endpoints
   reports: {
     transactionsMonthly: "/api/v1/reports/transactions/monthly",
+    disbursementsMonthly: "/api/v1/reports/disbursements/monthly",
   },
 
   // Logs endpoints

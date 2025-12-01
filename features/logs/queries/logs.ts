@@ -34,9 +34,8 @@ export interface AuditLogListParams {
 export function normalizeAuditLogParams(params: AuditLogListParams): AuditLogListParams {
     const normalized: AuditLogListParams = {
         page: params.page ?? 0,
-        per_page: params.per_page ?? 15,
+        per_page: params.per_page || 15,
     };
-
     // Add other params only if they have values
     if (params.search) normalized.search = params.search;
     if (params.user_id) normalized.user_id = params.user_id;

@@ -166,6 +166,27 @@ export interface MonthlyTransactionSummaryParams {
   pgo_id?: string
 }
 
+// Monthly Disbursement Summary Report Schema (FR-REP-001)
+export const MonthlyDisbursementSummarySchema = z.object({
+  report_period: z.string(), // Format: "YYYY-MM"
+  total_disbursements: z.number(),
+  total_value: z.number(),
+  currency: z.string(),
+  status_breakdown: z.record(z.string(), BreakdownItemSchema),
+  pgo_breakdown: z.record(z.string(), BreakdownItemSchema),
+  method_breakdown: z.record(z.string(), BreakdownItemSchema),
+})
+
+export type MonthlyDisbursementSummary = z.infer<typeof MonthlyDisbursementSummarySchema>
+
+// Query params for monthly disbursement summary
+export interface MonthlyDisbursementSummaryParams {
+  year: number
+  month?: number
+  merchant_id?: string
+  pgo_id?: string
+}
+
 import type { PaginatedApiResponse } from '@/lib/types'
 
 export type PaginatedDisbursementResponse = PaginatedApiResponse<Disbursement>

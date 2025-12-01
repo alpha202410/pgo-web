@@ -1,10 +1,18 @@
 import 'server-only';
 import { disbursementsKeys, normalizeDisbursementParams, type DisbursementListParams } from './disbursements';
-import { DisbursementSchema, PaginatedDisbursementResponse } from '@/lib/definitions';
+import { reportsKeys, normalizeReportParams, getCurrentPeriod } from './reports';
+import {
+    DisbursementSchema,
+    PaginatedDisbursementResponse,
+    MonthlyDisbursementSummarySchema,
+    type MonthlyDisbursementSummary,
+    type MonthlyDisbursementSummaryParams,
+} from '@/lib/definitions';
 import { API_CONFIG, API_ENDPOINTS } from '@/lib/config/api';
 import { getSession } from '@/lib/auth/services/auth.service';
 import { z } from 'zod';
 import { getQueryClient } from '@/lib/server-query-client';
+import { QUERY_CACHE } from '@/lib/config/constants';
 
 // Re-export getQueryClient and HydrateClient from trpc/server.tsx
 // This ensures we use the same query client instance
@@ -169,6 +177,104 @@ export async function prefetchDisbursementsList() {
   const cachedData = queryClient.getQueryData<PaginatedDisbursementResponse>(disbursementsKeys.list(normalizedParams));
   if (!cachedData) {
     console.warn('Warning: Prefetched disbursements data not found in cache');
+  }
+}
+
+/**
+ * Server-side function to fetch monthly disbursement summary
+ * Uses getSession() for authentication
+ */
+async function fetchMonthlyDisbursementSummaryServer(
+  params: MonthlyDisbursementSummaryParams
+): Promise<MonthlyDisbursementSummary> {
+  const session = await getSession();
+
+  if (!session?.token) {
+    throw new Error('Unauthorized: No session token available');
+  }
+
+  // Build query string with params
+  const queryParams = new URLSearchParams();
+  queryParams.set('year', params.year.toString());
+
+  if (params.month !== undefined) {
+    queryParams.set('month', params.month.toString());
+  }
+  if (params.merchant_id) {
+    queryParams.set('merchant_id', params.merchant_id);
+  }
+  if (params.pgo_id) {
+    queryParams.set('pgo_id', params.pgo_id);
+  }
+
+  const url = `${API_CONFIG.baseURL}${API_ENDPOINTS.reports.disbursementsMonthly}?${queryParams.toString()}`;
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session.token}`,
+    },
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    let errorMessage = 'Failed to fetch monthly disbursement summary';
+
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.message || errorData.error || errorMessage;
+    } catch {
+      errorMessage = response.statusText || errorMessage;
+    }
+
+    if (response.status === 401) {
+      throw new Error(`Unauthorized: ${errorMessage}`);
+    } else if (response.status === 403) {
+      throw new Error(`Forbidden: ${errorMessage}`);
+    } else if (response.status === 404) {
+      throw new Error(`Not Found: ${errorMessage}`);
+    }
+
+    throw new Error(`${errorMessage} (Status: ${response.status})`);
+  }
+
+  const responseData = await response.json();
+
+  // Parse and validate response data
+  // Handle if data is wrapped in a data property
+  const summaryData = responseData.data || responseData;
+  return MonthlyDisbursementSummarySchema.parse(summaryData);
+}
+
+/**
+ * Prefetch monthly disbursement summary for current period
+ * This will populate the TanStack Query cache with the current month's data
+ */
+export async function prefetchMonthlyDisbursementSummary(
+  params?: MonthlyDisbursementSummaryParams
+) {
+  const queryClient = getQueryClient();
+
+  // Use provided params or default to current period
+  const reportParams = params || getCurrentPeriod();
+  const normalizedParams = normalizeReportParams(reportParams);
+
+  const queryOptions = {
+    queryKey: reportsKeys.disbursementsMonthlyWithParams(normalizedParams),
+    queryFn: () => fetchMonthlyDisbursementSummaryServer(normalizedParams),
+    staleTime: QUERY_CACHE.STALE_TIME_DETAIL,
+  };
+
+  // Ensure prefetch completes before continuing
+  await queryClient.prefetchQuery(queryOptions);
+
+  // Verify the data is in the cache
+  const cachedData = queryClient.getQueryData<MonthlyDisbursementSummary>(
+    reportsKeys.disbursementsMonthlyWithParams(normalizedParams)
+  );
+  if (!cachedData) {
+    console.warn('Warning: Prefetched monthly disbursement summary not found in cache');
   }
 }
 

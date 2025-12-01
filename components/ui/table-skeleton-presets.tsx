@@ -51,5 +51,16 @@ export const USERS_TABLE_COLUMNS: TableColumnSkeleton[] = [
     { width: 'w-8', type: 'button' }, // Actions
 ];
 
+export const LOGS_TABLE_COLUMNS: TableColumnSkeleton[] = [
+    { width: 'w-8', type: 'checkbox', align: 'center' },
+    { width: 'w-[180px]', type: 'text' }, // Audit Log ID
+    { width: 'w-[200px]', type: 'badge' }, // Action
+    { width: 'w-[200px]', type: 'text' }, // Username
+    { width: 'w-[400px]', type: 'text' }, // Description
+    { width: 'w-[150px]', type: 'text' }, // IP Address
+    { width: 'w-[160px]', type: 'text' }, // Timestamp
+    { width: 'w-8', type: 'button' }, // Actions
+];
+
 
 
