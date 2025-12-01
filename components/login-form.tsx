@@ -8,18 +8,24 @@ import {
   FieldDescription,
   FieldGroup,
   FieldLabel,
-  FieldSeparator,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { useActionState } from 'react'
 import { login } from '@/app/(auth)/actions/auth.actions'
+import { FormState } from '@/lib/definitions'
 import Image from "next/image"
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
-  const [state, action, pending] = useActionState(login, undefined)
+  const [state, action, pending] = useActionState(
+    async (prevState: FormState, formData: FormData) => {
+      const result = await login(prevState, formData)
+      return result ?? undefined
+    },
+    undefined
+  )
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>

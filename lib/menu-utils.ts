@@ -1,7 +1,7 @@
 import 'server-only'
 
 import { hasAnyPermission, hasAllPermissions } from './auth/permissions'
-import { MenuItem, DocumentMenuItem } from './menu-config'
+import { MenuItem } from './menu-config'
 
 /**
  * Filter menu items based on user roles and permissions
@@ -10,7 +10,7 @@ import { MenuItem, DocumentMenuItem } from './menu-config'
  * @param roles - Array of user roles
  * @returns Filtered array of menu items that the user has access to
  */
-export function filterMenuItems<T extends MenuItem | DocumentMenuItem>(
+export function filterMenuItems<T extends MenuItem>(
   items: T[],
   roles: string[]
 ): T[] {

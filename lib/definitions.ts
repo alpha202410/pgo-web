@@ -128,8 +128,8 @@ export const AuditLogSchema = z.object({
   action: z.string(), // e.g., 'USER_CREATED', 'PGO_UPDATED' - required field from API
   description: z.string(),
   ip_address: z.string(),
-  old_values: z.record(z.unknown()).nullable(),
-  new_values: z.record(z.unknown()).nullable(),
+  old_values: z.record(z.string(), z.unknown()).nullable(),
+  new_values: z.record(z.string(), z.unknown()).nullable(),
   timestamp: z.string(), // datetime
 })
 

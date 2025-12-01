@@ -1,23 +1,27 @@
 import 'server-only';
-import { merchantsKeys, normalizeMerchantParams, type MerchantListParams } from './logs';
-import { MerchantSchema, PaginatedMerchantResponse } from '@/lib/definitions';
+import { auditLogsKeys, normalizeAuditLogParams, type AuditLogListParams } from './logs';
+import { AuditLogSchema } from '@/lib/definitions';
 import { API_CONFIG, API_ENDPOINTS } from '@/lib/config/api';
 import { getSession } from '@/lib/auth/services/auth.service';
 import { z } from 'zod';
 import { getQueryClient } from '@/lib/server-query-client';
+import type { PaginatedApiResponse } from '@/lib/types';
+import type { AuditLog } from '@/lib/definitions';
 
 // Re-export getQueryClient and HydrateClient from trpc/server.tsx
 // This ensures we use the same query client instance
 export { getQueryClient, HydrateClient } from '@/lib/server-query-client';
 
+type PaginatedAuditLogResponse = PaginatedApiResponse<AuditLog>;
+
 /**
- * Server-side function to fetch paginated merchants list
+ * Server-side function to fetch paginated audit logs list
  * Uses getSession() for authentication
  * This function is server-only and should not be imported in client components
  */
-async function fetchMerchantsListServer(
-    params: MerchantListParams = { page: 0, per_page: 15 }
-): Promise<PaginatedMerchantResponse> {
+async function fetchAuditLogsListServer(
+    params: AuditLogListParams = { page: 0, per_page: 15 }
+): Promise<PaginatedAuditLogResponse> {
     const session = await getSession();
 
     if (!session?.token) {
@@ -25,23 +29,25 @@ async function fetchMerchantsListServer(
     }
 
     // Build query string with pagination params
-    // Backend API uses 'size' instead of 'per_page' and 0-based pagination
     const page = params.page ?? 0;
     const per_page = params.per_page ?? 15;
     const queryParams = new URLSearchParams();
     queryParams.set('page', page.toString());
-    queryParams.set('size', per_page.toString());
+    queryParams.set('per_page', per_page.toString());
 
     // Add other filter params if present
     if (params) {
         Object.entries(params).forEach(([key, value]) => {
-            if (key !== 'page' && key !== 'per_page' && value !== undefined && value !== null && value !== '') {
+            if (key === 'sort' && Array.isArray(value) && value.length > 0) {
+                // Handle sort as comma-separated string
+                queryParams.set('sort', value.join(','));
+            } else if (key !== 'page' && key !== 'per_page' && value !== undefined && value !== null && value !== '') {
                 queryParams.set(key, value.toString());
             }
         });
     }
 
-    const url = `${API_CONFIG.baseURL}${API_ENDPOINTS.merchants.list}?${queryParams.toString()}`;
+    const url = `${API_CONFIG.baseURL}${API_ENDPOINTS.logs.auditLogs}?${queryParams.toString()}`;
 
     const response = await fetch(url, {
         method: 'GET',
@@ -53,7 +59,7 @@ async function fetchMerchantsListServer(
     });
 
     if (!response.ok) {
-        let errorMessage = 'Failed to fetch merchants';
+        let errorMessage = 'Failed to fetch audit logs';
 
         // Try to extract error message from response
         try {
@@ -79,11 +85,11 @@ async function fetchMerchantsListServer(
     const responseData = await response.json();
 
     // Handle both array response (legacy) and paginated response
-    let paginatedResponse: PaginatedMerchantResponse;
+    let paginatedResponse: PaginatedAuditLogResponse;
 
     if (Array.isArray(responseData)) {
         // Legacy format: just an array
-        const parsed = z.array(MerchantSchema).parse(responseData);
+        const parsed = z.array(AuditLogSchema).parse(responseData);
 
         paginatedResponse = {
             data: parsed,
@@ -95,31 +101,18 @@ async function fetchMerchantsListServer(
             first: page === 0,
         };
     } else {
-        // Paginated response format: { data, meta: { total, per_page, current_page, last_page, from, to } }
-        // Backend returns 1-based pagination (current_page: 1 = first page), frontend expects 0-based (pageNumber: 0 = first page)
-        const merchantsData = responseData.data || [];
-        const meta = responseData.meta || {};
-        const parsed = z.array(MerchantSchema).parse(merchantsData);
-
-        // Convert 1-based backend pagination to 0-based frontend pagination
-        const backendCurrentPage = meta.current_page;
-        const backendLastPage = meta.last_page;
-        const frontendPageNumber = backendCurrentPage !== undefined ? backendCurrentPage - 1 : page;
-        const calculatedTotalPages = Math.ceil((meta.total ?? parsed.length) / (meta.per_page ?? per_page));
-        const totalPages = backendLastPage ?? calculatedTotalPages;
+        // Paginated response format
+        const auditLogsData = responseData.data || [];
+        const parsed = z.array(AuditLogSchema).parse(auditLogsData);
 
         paginatedResponse = {
             data: parsed,
-            pageNumber: frontendPageNumber,
-            pageSize: meta.per_page ?? per_page,
-            totalElements: meta.total ?? parsed.length,
-            totalPages: totalPages,
-            // Check if meta exists and has values before comparing (fixes undefined === undefined bug)
-            // If meta is missing, calculate last based on frontend page number
-            last: backendCurrentPage !== undefined && backendLastPage !== undefined 
-                ? backendCurrentPage === backendLastPage 
-                : frontendPageNumber >= totalPages - 1,
-            first: backendCurrentPage === 1 || (backendCurrentPage === undefined && page === 0),
+            pageNumber: responseData.pageNumber ?? page,
+            pageSize: responseData.pageSize ?? per_page,
+            totalElements: responseData.totalElements ?? parsed.length,
+            totalPages: responseData.totalPages ?? Math.ceil((responseData.totalElements ?? parsed.length) / (responseData.pageSize ?? per_page)),
+            last: responseData.last ?? false,
+            first: responseData.first ?? (page === 0),
         };
     }
 
@@ -127,16 +120,16 @@ async function fetchMerchantsListServer(
 }
 
 /**
- * Server-side function to fetch single merchant details
+ * Server-side function to fetch single audit log details
  */
-async function fetchMerchantDetailServer(merchantId: string) {
+async function fetchAuditLogDetailServer(auditLogId: string) {
     const session = await getSession();
 
     if (!session?.token) {
         throw new Error('Unauthorized: No session token available');
     }
 
-    const url = `${API_CONFIG.baseURL}${API_ENDPOINTS.merchants.getById.replace('{id}', merchantId)}`;
+    const url = `${API_CONFIG.baseURL}${API_ENDPOINTS.logs.auditLogs}/${auditLogId}`;
 
     const response = await fetch(url, {
         method: 'GET',
@@ -148,7 +141,7 @@ async function fetchMerchantDetailServer(merchantId: string) {
     });
 
     if (!response.ok) {
-        let errorMessage = 'Failed to fetch merchant';
+        let errorMessage = 'Failed to fetch audit log';
 
         try {
             const errorData = await response.json();
@@ -169,27 +162,27 @@ async function fetchMerchantDetailServer(merchantId: string) {
     }
 
     const responseData = await response.json();
-    return MerchantSchema.parse(responseData);
+    return AuditLogSchema.parse(responseData);
 }
 
 /**
- * Prefetch first page of merchants list on the server
+ * Prefetch first page of audit logs list on the server
  * This will populate the TanStack Query cache with the initial page
  * Client-side will dynamically prefetch the next 2 pages based on current page
  */
-export async function prefetchMerchantsList() {
+export async function prefetchAuditLogsList() {
     const queryClient = getQueryClient();
 
     // Prefetch only the first page on server (0-based pagination)
     // Client-side will handle dynamic prefetching of next pages
-    const params: MerchantListParams = { page: 0, per_page: 15 };
+    const params: AuditLogListParams = { page: 0, per_page: 15 };
 
     // Normalize params to ensure query key matches client-side queries
-    const normalizedParams = normalizeMerchantParams(params);
+    const normalizedParams = normalizeAuditLogParams(params);
 
     const queryOptions = {
-        queryKey: merchantsKeys.list(normalizedParams),
-        queryFn: () => fetchMerchantsListServer(normalizedParams),
+        queryKey: auditLogsKeys.list(normalizedParams),
+        queryFn: () => fetchAuditLogsListServer(normalizedParams),
         staleTime: 30 * 1000, // 30 seconds
     };
 
@@ -197,9 +190,8 @@ export async function prefetchMerchantsList() {
     await queryClient.prefetchQuery(queryOptions);
 
     // Verify the data is in the cache
-    const cachedData = queryClient.getQueryData<PaginatedMerchantResponse>(merchantsKeys.list(normalizedParams));
+    const cachedData = queryClient.getQueryData<PaginatedAuditLogResponse>(auditLogsKeys.list(normalizedParams));
     if (!cachedData) {
-        console.warn('Warning: Prefetched merchants data not found in cache');
+        console.warn('Warning: Prefetched audit logs data not found in cache');
     }
 }
-

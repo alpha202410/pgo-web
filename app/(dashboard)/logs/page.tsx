@@ -1,4 +1,4 @@
-import { HydrateClient } from '@/features/merchants/queries/server';
+import { HydrateClient } from '@/features/logs/queries/server';
 import { requirePermission } from '@/lib/auth/auth';
 import { PERMISSIONS } from '@/lib/auth/permissions';
 import { Suspense } from 'react';
